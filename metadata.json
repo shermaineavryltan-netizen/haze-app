@@ -1,0 +1,6 @@
+{
+  "name": "SG AirAlert: Live Singapore PSI & Haze Tracker",
+  "description": "Real-time Singapore PSI & PM2.5 air quality radar with interactive regional maps, transboundary haze tracking, and proactive unhealthy threshold alerts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
