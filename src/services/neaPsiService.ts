@@ -168,6 +168,113 @@ export function getTransboundaryStatus(psiSouth: number): TransboundaryStatus {
  * Fetch live readings from NEA Singapore Open Data
  */
 export async function fetchLiveNeaPsi(): Promise<FormattedPsiData> {
+  // First attempt: Call our serverless /api/psi endpoint
+  try {
+    const apiRes = await fetch('/api/psi');
+    if (apiRes.ok) {
+      const serverlessData = await apiRes.json();
+      if (serverlessData.success && serverlessData.regional?.psi_twenty_four_hourly) {
+        const rawPsi = serverlessData.regional.psi_twenty_four_hourly;
+        const rawPm25 = serverlessData.regional.pm25_twenty_four_hourly || {};
+        const rawPm10 = serverlessData.regional.pm10_twenty_four_hourly || {};
+        const rawO3 = serverlessData.regional.o3_eight_hour_max || {};
+        const rawNo2 = serverlessData.regional.no2_one_hour_max || {};
+        const rawSo2 = serverlessData.regional.so2_twenty_four_hourly || {};
+        const rawCo = serverlessData.regional.co_eight_hour_max || {};
+
+        const computeNational = (map: Record<string, number>, def = 50) => {
+          if (map.national) return map.national;
+          const vals = Object.values(map).filter(v => typeof v === 'number');
+          return vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : def;
+        };
+
+        const psi: Record<RegionKey, number> = {
+          central: rawPsi.central || 50,
+          east: rawPsi.east || 50,
+          north: rawPsi.north || 50,
+          south: rawPsi.south || 50,
+          west: rawPsi.west || 50,
+          national: computeNational(rawPsi, 50),
+        };
+
+        const pm25One: Record<RegionKey, number> = {
+          central: rawPm25.central || 18,
+          east: rawPm25.east || 18,
+          north: rawPm25.north || 18,
+          south: rawPm25.south || 18,
+          west: rawPm25.west || 18,
+          national: computeNational(rawPm25, 18),
+        };
+
+        const pm10: Record<RegionKey, number> = {
+          central: rawPm10.central || 30,
+          east: rawPm10.east || 30,
+          north: rawPm10.north || 30,
+          south: rawPm10.south || 30,
+          west: rawPm10.west || 30,
+          national: computeNational(rawPm10, 30),
+        };
+
+        const o3: Record<RegionKey, number> = {
+          central: rawO3.central || 25,
+          east: rawO3.east || 25,
+          north: rawO3.north || 25,
+          south: rawO3.south || 25,
+          west: rawO3.west || 25,
+          national: computeNational(rawO3, 25),
+        };
+
+        const no2: Record<RegionKey, number> = {
+          central: rawNo2.central || 25,
+          east: rawNo2.east || 25,
+          north: rawNo2.north || 25,
+          south: rawNo2.south || 25,
+          west: rawNo2.west || 25,
+          national: computeNational(rawNo2, 25),
+        };
+
+        const so2: Record<RegionKey, number> = {
+          central: rawSo2.central || 8,
+          east: rawSo2.east || 8,
+          north: rawSo2.north || 8,
+          south: rawSo2.south || 8,
+          west: rawSo2.west || 8,
+          national: computeNational(rawSo2, 8),
+        };
+
+        const co: Record<RegionKey, number> = {
+          central: rawCo.central || 0.6,
+          east: rawCo.east || 0.6,
+          north: rawCo.north || 0.6,
+          south: rawCo.south || 0.6,
+          west: rawCo.west || 0.6,
+          national: computeNational(rawCo, 0.6),
+        };
+
+        const transboundary = getTransboundaryStatus(psi.south || 60);
+        const history24h = generate24HourHistory(psi, pm25One);
+
+        return {
+          timestamp: serverlessData.observationTimestamp || new Date().toISOString(),
+          updateTimestamp: serverlessData.updatedTimestamp || new Date().toISOString(),
+          source: 'live_api',
+          psi,
+          pm25OneHourly: pm25One,
+          pm25TwentyFourHourly: pm25One,
+          pm10,
+          o3,
+          no2,
+          so2,
+          co,
+          transboundary,
+          history24h,
+        };
+      }
+    }
+  } catch {
+    // Fall back to direct external endpoints
+  }
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
